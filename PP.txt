@@ -1,0 +1,35 @@
+Privacy Policy for Market Mover
+Last Updated: June 27, 2025
+
+1. Introduction
+This Privacy Policy explains how Whale Advisory Board, wab3.io collects, uses, and protects your information when you use the Market Mover Discord bot ("the Bot"). The Bot is designed for a daily prediction game involving cryptocurrency, stock, and forex markets.
+
+2. Information We Collect
+- **User Data**: The Bot collects your Discord user ID and in-game points when you participate in predictions. This data is stored locally in a JSON file ("players.json") on the Developer's device.
+- **No Personal Data**: We do not collect names, emails, or other personal details beyond your Discord ID, which is publicly available via Discord.
+- **Voluntary Participation**: Data is only collected when you interact with the Bot (e.g., reacting with 📈/📉 or using !predict, !bet, !leverage).
+
+3. How We Use Your Information
+- **Gameplay**: User IDs and points are used to track your predictions and calculate point gains or losses.
+- **Local Storage**: Data is saved locally and not transmitted to third parties or cloud services.
+- **Improvement**: Aggregate, anonymized data may be used to improve the Bot, but no individual data is shared.
+
+4. Data Sharing and Disclosure
+- We do not sell, trade, or transfer your data to third parties.
+- Data may be disclosed if required by law or to protect the safety of the Developer or users (e.g., in case of abuse).
+
+5. Data Security
+- Data is stored in a local JSON file with restricted access on the Developer's device.
+- While we take reasonable precautions, no method is 100% secure, and the Developer is not liable for unauthorized access due to external factors.
+
+6. Your Rights
+- You can request deletion of your data by contacting the Developer at [your.email@example.com] or via Discord DM to [your Discord username].
+- Deletion requests will be processed within a reasonable time frame, removing your user ID and points from the Bot's records.
+
+7. Changes to This Policy
+The Developer may update this Privacy Policy at any time. Continued use after changes constitutes acceptance. Updates will be noted with a new "Last Updated" date.
+
+8. Contact Us
+For questions, concerns, or data deletion requests, reach out to the Developer at founders@wab3,io or Discord DM to @wab3.io.
+
+© 2025 wab3.io. All rights reserved.
