@@ -9,9 +9,11 @@ import asyncio
 import time
 import random
 from pytz import timezone
+from flask import Flask
+from threading import Thread
 
 # Bot setup
-load_dotenv("C:/Users/jason/Desktop/Discord_game/.env")  # Specify path
+load_dotenv()  # Use default Replit .env loading
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 print(f"Loaded BOT_TOKEN: {BOT_TOKEN}")  # Debug token loading
 if not BOT_TOKEN:
@@ -40,7 +42,7 @@ print(f"Current working directory: {os.getcwd()}")  # Debug directory
 # Load or initialize players.json
 def load_players():
     try:
-        with open("C:/Users/Jason/Desktop/Discord_game/players.json", "a+") as f:  # Create and read
+        with open("players.json", "a+") as f:  # Use relative path for Replit
             f.seek(0)  # Move to start of file
             content = f.read().strip()
             if not content:  # If empty, initialize with empty dict
@@ -56,7 +58,7 @@ def load_players():
 def save_players(players):
     print("Attempting to save players...")
     try:
-        with open("C:/Users/Jason/Desktop/Discord_game/players.json", "w") as f:  # Adjust path
+        with open("players.json", "w") as f:  # Use relative path for Replit
             json.dump(players, f)
         print(f"Players saved to players.json: {players}")
     except Exception as e:
@@ -96,6 +98,20 @@ def get_daily_assets():
         "forex": get_random_forex()
     }
 
+# Web server for keep-alive
+app = Flask('')
+
+@app.route('/')
+def home():
+    return "Bot is running"
+
+def run():
+    app.run(host='0.0.0.0', port=8080)
+
+def keep_alive():
+    t = Thread(target=run)
+    t.start()
+
 # Bot ready event
 @bot.event
 async def on_ready():
@@ -106,16 +122,17 @@ async def on_ready():
     # Start fresh with no initial players beyond load
     print(f"Before save, players: {players}")  # Debug
     save_players(players)  # Save initial state
-    print("Bot is ready and waiting for scheduled posts at 7:30 AM PT...")
+    keep_alive()  # Start web server
+    print("Bot is ready and waiting for scheduled posts at 6:30 AM PT...")
 
-# Game loop (posts at 7:30 AM and 2:00 PM PT, weekdays only)
+# Game loop (posts at 6:30 AM and 2:00 PM PT, weekdays only)
 async def game_loop():
     while True:
         pacific = timezone('America/Los_Angeles')
         now = pacific.localize(time.localtime())  # Use PT timezone
         # Skip weekends (Saturday=5, Sunday=6 in weekday numbering)
         if 0 <= now.weekday() <= 4:  # Monday to Friday
-            if now.hour == 7 and now.minute == 30:  # 7:30 AM PT
+            if now.hour == 6 and now.minute == 30:  # 6:30 AM PT
                 await post_assets()
             elif now.hour == 14 and now.minute == 0:  # 2:00 PM PT
                 await check_results()
@@ -135,7 +152,7 @@ async def post_assets():
             embed = discord.Embed(
                 title=f"Daily {mention} Prediction",
                 description=f"Will {asset['name']} ({asset['symbol']}) go 📈 or 📉 by 2:00 PM PT?\n"
-                            f"React with 📈 or 📉 to predict for free! Win 10 points per correct answer. "
+                            f"Posted at 6:30 AM PT. React with 📈 or 📉 to predict for free! Win 10 points per correct answer. "
                             f"Use `!bet <points> <up/down> {category}` to wager your points, or `!leverage <points> {category}` to increase your bet.",
                 color=0x00ff00
             )
@@ -270,8 +287,8 @@ async def check_results():
         for user_id, user_bets in bets.items():
             if category in user_bets:
                 bet = user_bets[category]
-                # Enforce 6-hour 30-minute window (23,400 seconds) for game schedule
-                if time.time() - bet["timestamp"] > 23400:
+                # Enforce 7.5-hour window (27,000 seconds) for game schedule
+                if time.time() - bet["timestamp"] > 27000:
                     continue
                 multiplier = 1 if bet["direction"] == results[category]["direction"] else 0  # 1 for correct, 0 for incorrect
                 points_won = bet["points"] * multiplier + 10 if multiplier else 0  # 10 points for correct, wager returned if incorrect
@@ -303,7 +320,7 @@ async def leaderboard(ctx):
         embed.add_field(name=f"{i}. {data['name']}", value=f"{data['points']} points", inline=False)
     await ctx.send(embed=embed)
 
-# Support command with donation link (example addresses)
+# Support command with donation link (your actual addresses)
 @bot.command()
 async def support(ctx):
     await ctx.send("Support Market Mover! Time is money—tip to keep the markets moving. Donate:\n- Bitcoin (BTC): bc1qdpugyzg3jv8s88qs0xpt6gh4kewnh8ek3udgpe\n- USDC on ETH: 0x4F3a5C130d1aa7dE39BEe1Ff455039eCEeD7682")
