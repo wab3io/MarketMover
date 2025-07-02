@@ -40,13 +40,12 @@ print(f"Current working directory: {os.getcwd()}")  # Debug directory
 # Load or initialize players.json
 def load_players():
     try:
-        with open("C:/Users/Jason/Desktop/Discord_game/players.json", "a") as f:  # Create if not exists
-            pass
-        with open("C:/Users/Jason/Desktop/Discord_game/players.json", "r") as f:
+        with open("C:/Users/Jason/Desktop/Discord_game/players.json", "a+") as f:  # Create and read
+            f.seek(0)  # Move to start of file
             content = f.read().strip()
-            if not content:  # Handle empty file
+            if not content:  # If empty, initialize with empty dict
                 return {}
-            return json.loads(content)  # Use json.loads to handle string content
+            return json.loads(content)
     except FileNotFoundError:
         return {}
     except json.JSONDecodeError:
@@ -307,7 +306,7 @@ async def leaderboard(ctx):
 # Support command with donation link (example addresses)
 @bot.command()
 async def support(ctx):
-    await ctx.send("Support Market Mover! Time is money—tip to keep the markets moving. Donate:\n- Bitcoin (BTC): 1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa\n- Ethereum (ETH): 0x1234abcd...5678efgh")
+    await ctx.send("Support Market Mover! Time is money—tip to keep the markets moving. Donate:\n- Bitcoin (BTC): bc1qdpugyzg3jv8s88qs0xpt6gh4kewnh8ek3udgpe\n- USDC on ETH: 0x4F3a5C130d1aa7dE39BEe1Ff455039eCEeD7682")
 
 # Start bot
 bot.run(BOT_TOKEN)
