@@ -37,7 +37,7 @@ CHANNEL_ID = {}  # Dictionary to store channel IDs per guild
 stocks = ["AAPL", "GOOGL", "MSFT", "AMZN", "TSLA", "NVDA", "META", "JPM", "V", "WMT"]
 forex = ["EUR/USD", "USD/JPY", "GBP/USD", "AUD/USD", "CHF/USD", "CAD/USD", "NZD/USD", "EUR/JPY"]
 
-print(f"Current working dictionary: {os.getcwd()}")  # Debug directory
+print(f"Current working directory: {os.getcwd()}")  # Debug directory
 
 # Load or initialize players.json
 def load_players():
