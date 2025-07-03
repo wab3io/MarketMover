@@ -1,0 +1,39 @@
+Terms of Service for Market Mover
+Last Updated: June 27, 2025
+
+1. Acceptance of Terms
+By using the Market Mover Discord bot ("the Bot"), you agree to these Terms of Service ("ToS"). If you do not agree, stop using it. The Bot is provided by The Whale Advisory Board, wab3.io.
+
+2. Description of Service
+Market Mover is a Discord bot for a daily prediction game covering cryptocurrency, stock, and forex markets. Users can bet points (one per category: crypto, stock, forex) using reactions (📈 or 📉) or commands (!predict, !bet, !leverage). Points are tracked locally by the Developer.
+
+3. User Conduct
+- Follow Discord’s Community Guidelines and Terms of Service.
+- Only one prediction per category is allowed daily. Changing bets is prohibited.
+- No cheating, bug exploitation, or command spamming. Violations may lead to access termination.
+- Users are responsible for their predictions and any point losses.
+
+4. Points and Gameplay
+- Starting points are 100 per user, adjustable by prediction outcomes.
+- Points won’t drop below zero. The Developer isn’t liable for point management beyond game rules.
+- Leverage is limited to the initial bet and follows the one-prediction rule.
+
+5. Intellectual Property
+All Market Mover code, design, and content belong to the Developer. Users may not reverse-engineer, distribute, or modify it without permission.
+
+6. Limitation of Liability
+The Bot is provided "as is" with no warranties. The Developer isn’t liable for losses, damages, or prediction inaccuracies. It’s for entertainment only, using random data.
+
+7. Termination of Access
+The Developer can terminate or suspend access anytime for ToS or Discord policy violations, without notice.
+
+8. Changes to Terms
+The Developer may update these ToS. Continued use after changes means acceptance. Updates will note a new "Last Updated" date.
+
+9. Governing Law
+These ToS are governed by U.S. law. Disputes are resolved in the relevant jurisdiction.
+
+10. Contact
+For questions or data deletion requests, contact the Developer at founders@wab3.io or Discord DM to @wab3.io.
+
+© 2025 wab3.io. All rights reserved.

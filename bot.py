@@ -18,6 +18,10 @@ BOT_TOKEN = os.getenv("BOT_TOKEN")
 print(f"Loaded BOT_TOKEN: {BOT_TOKEN}")  # Debug token loading
 if not BOT_TOKEN:
     print("Error: BOT_TOKEN is not loaded. Check .env file and path.")
+<<<<<<< HEAD
+=======
+CHANNEL_ID = 1276115765589970966  # Replace with your channel ID (as a number)
+>>>>>>> 1b3bc83fe93fe94b96a61f6c8e6661d9d228c284
 
 intents = Intents.default()
 intents.message_content = True  # Allows the bot to read message content
@@ -31,7 +35,10 @@ players = {}
 bets = {}  # {user_id: {category: {"points": int, "direction": str, "timestamp": float}}}
 current_assets = {}  # Store assets {category: asset}
 current_messages = {}  # Track multiple messages {category: message}
+<<<<<<< HEAD
 CHANNEL_ID = {}  # Dictionary to store channel IDs per guild
+=======
+>>>>>>> 1b3bc83fe93fe94b96a61f6c8e6661d9d228c284
 
 # Mock data for stocks and forex (since free APIs are limited)
 stocks = ["AAPL", "GOOGL", "MSFT", "AMZN", "TSLA", "NVDA", "META", "JPM", "V", "WMT"]
@@ -90,6 +97,7 @@ def get_random_forex():
     pair = random.choice(forex)
     return {"name": pair, "symbol": pair, "current_price": round(random.uniform(0.8, 1.5), 4)}
 
+<<<<<<< HEAD
 # Get default channel in each server
 def get_default_channel(guild):
     for channel in guild.text_channels:
@@ -97,6 +105,8 @@ def get_default_channel(guild):
             return channel
     return None
 
+=======
+>>>>>>> 1b3bc83fe93fe94b96a61f6c8e6661d9d228c284
 # Get daily assets (one random from each category)
 def get_daily_assets():
     return {
@@ -152,6 +162,7 @@ async def post_assets():
     current_assets = get_daily_assets()
     if not all(current_assets.values()):
         return
+<<<<<<< HEAD
     for guild in bot.guilds:  # Post in all servers where the bot is added
         guild_id = guild.id
         channel = bot.get_channel(CHANNEL_ID.get(guild_id)) if CHANNEL_ID.get(guild_id) and bot.get_channel(CHANNEL_ID.get(guild_id)) else await get_default_channel(guild)
@@ -170,6 +181,24 @@ async def post_assets():
                 await current_messages[category].add_reaction("📉")  # Stock down emoji
         else:
             print(f"No suitable channel found in guild {guild.name} (ID: {guild.id})")
+=======
+    channel = bot.get_channel(CHANNEL_ID)
+    if channel and channel.id == CHANNEL_ID:  # Validate channel
+        for category, asset in current_assets.items():
+            mention = "@Crypto" if category == "crypto" else "@Stocks" if category == "stock" else "@FOREX"
+            embed = discord.Embed(
+                title=f"Daily {mention} Prediction",
+                description=f"Will {asset['name']} ({asset['symbol']}) go 📈 or 📉 by 2:00 PM PT?\n"
+                            f"Posted at 6:30 AM PT. React with 📈 or 📉 to predict for free! Win 10 points per correct answer. "
+                            f"Use `!bet <points> <up/down> {category}` to wager your points, or `!leverage <points> {category}` to increase your bet.",
+                color=0x00ff00
+            )
+            current_messages[category] = await channel.send(embed=embed)
+            await current_messages[category].add_reaction("📈")  # Stock up emoji
+            await current_messages[category].add_reaction("📉")  # Stock down emoji
+    else:
+        print(f"Invalid channel ID: {CHANNEL_ID}")
+>>>>>>> 1b3bc83fe93fe94b96a61f6c8e6661d9d228c284
 
 # Handle reactions (per category, no channel confirmation, free prediction)
 @bot.event
@@ -198,6 +227,7 @@ async def on_reaction_add(reaction, user):
 # Bet command (wager accumulated points)
 @bot.command()
 async def bet(ctx, points: int, direction: str, category: str):
+<<<<<<< HEAD
     if not current_assets:
         await ctx.send("No active predictions. Please wait for the daily post at 6:30 AM PT.")
         return
@@ -211,25 +241,45 @@ async def bet(ctx, points: int, direction: str, category: str):
     if category not in ["crypto", "stock", "forex"]:
         await ctx.send("Category must be 'crypto', 'stock', or 'forex'.")
         return
+=======
+    if not current_assets or ctx.channel.id != CHANNEL_ID:  # Validate channel
+        return  # No message
+    if direction.lower() not in ["up", "down"]:
+        return  # No message
+    if points < 0 or points > players.get(str(ctx.author.id), {"points": 0})["points"]:
+        return  # No message or negative wager
+    category = category.lower()
+    if category not in ["crypto", "stock", "forex"]:
+        return  # No message
+>>>>>>> 1b3bc83fe93fe94b96a61f6c8e6661d9d228c284
     user_id = str(ctx.author.id)
     if user_id not in players:
         players[user_id] = {"points": 100, "name": ctx.author.name}
     if user_id not in bets:
         bets[user_id] = {}
     if category in bets[user_id]:
+<<<<<<< HEAD
         await ctx.send("You’ve already placed a bet for this category today.")
         return
+=======
+        print(f"{ctx.author.name} tried to change bet on {category}, selection locked")
+        return  # Prevent changing bet
+>>>>>>> 1b3bc83fe93fe94b96a61f6c8e6661d9d228c284
     bets[user_id][category] = {"points": points, "direction": direction.lower(), "timestamp": time.time()}
     players[user_id]["points"] -= points  # Deduct wager
     if players[user_id]["points"] < 0:  # Prevent negative points
         players[user_id]["points"] = 0
     save_players(players)
+<<<<<<< HEAD
     await ctx.send(f"{ctx.author.name} wagered {points} points on {category} ({direction}) at {time.ctime()}, New balance: {players[user_id]['points']}")
+=======
+>>>>>>> 1b3bc83fe93fe94b96a61f6c8e6661d9d228c284
     print(f"{ctx.author.name} wagered {points} points on {category} ({direction}) at {time.ctime()}, New balance: {players[user_id]['points']}")
 
 # Predict command (free prediction)
 @bot.command()
 async def predict(ctx, direction: str, category: str):
+<<<<<<< HEAD
     if not current_assets:
         await ctx.send("No active predictions. Please wait for the daily post at 6:30 AM PT.")
         return
@@ -241,30 +291,53 @@ async def predict(ctx, direction: str, category: str):
     if category not in ["crypto", "stock", "forex"]:
         await ctx.send("Category must be 'crypto', 'stock', or 'forex'.")
         return
+=======
+    if not current_assets or ctx.channel.id != CHANNEL_ID:  # Validate channel
+        return  # No message
+    direction = direction.lower()
+    if direction not in ["up", "down"]:
+        return  # No message
+    category = category.lower()
+    if category not in ["crypto", "stock", "forex"]:
+        return  # No message
+>>>>>>> 1b3bc83fe93fe94b96a61f6c8e6661d9d228c284
     user_id = str(ctx.author.id)
     if user_id not in players:
         players[user_id] = {"points": 100, "name": ctx.author.name}
     if user_id not in bets:
         bets[user_id] = {}
     if category in bets[user_id]:
+<<<<<<< HEAD
         await ctx.send("You’ve already made a prediction for this category today.")
         return
     bets[user_id][category] = {"points": 0, "direction": direction, "timestamp": time.time()}  # No cost
     save_players(players)  # Save to ensure player exists
     await ctx.send(f"{ctx.author.name} predicted {direction} on {category} for free at {time.ctime()}, Current balance: {players[user_id]['points']}")
+=======
+        print(f"{ctx.author.name} tried to change prediction on {category}, selection locked")
+        return  # Prevent changing prediction
+    bets[user_id][category] = {"points": 0, "direction": direction, "timestamp": time.time()}  # No cost
+    save_players(players)  # Save to ensure player exists
+>>>>>>> 1b3bc83fe93fe94b96a61f6c8e6661d9d228c284
     print(f"{ctx.author.name} predicted {direction} on {category} for free at {time.ctime()}, Current balance: {players[user_id]['points']}")
 
 # Leverage command (increase wager)
 @bot.command()
 async def leverage(ctx, points: int, category: str):
+<<<<<<< HEAD
     if not current_assets:
         await ctx.send("No active predictions. Please wait for the daily post at 6:30 AM PT.")
         return
+=======
+    if not current_assets or ctx.channel.id != CHANNEL_ID:  # Validate channel
+        return  # No message
+>>>>>>> 1b3bc83fe93fe94b96a61f6c8e6661d9d228c284
     user_id = str(ctx.author.id)
     if user_id not in players:
         players[user_id] = {"points": 100, "name": ctx.author.name}
     current_points = players[user_id]["points"]
     if points <= 0 or points > current_points:
+<<<<<<< HEAD
         await ctx.send("Invalid leverage amount or insufficient points.")
         return
     category = category.lower()
@@ -295,11 +368,32 @@ async def setchannel(ctx):
     CHANNEL_ID[guild_id] = ctx.channel.id
     await ctx.send(f"Channel set to {ctx.channel.name} (ID: {CHANNEL_ID[guild_id]}) for this server.")
 
+=======
+        return  # No message
+    category = category.lower()
+    if category not in ["crypto", "stock", "forex"]:
+        return  # No message
+    if user_id not in bets or category not in bets[user_id]:
+        return  # No message
+    initial_points = bets[user_id][category]["points"]
+    total_wager = initial_points + points
+    if total_wager > current_points:  # Limit total wager to current points
+        print(f"{ctx.author.name} tried to exceed current points on {category}")
+        return
+    players[user_id]["points"] -= points
+    if players[user_id]["points"] < 0:  # Prevent negative points
+        players[user_id]["points"] = 0
+    bets[user_id][category]["points"] = total_wager  # Update wager
+    save_players(players)
+    print(f"{ctx.author.name} leveraged {points} points on {category} at {time.ctime()}, New balance: {players[user_id]['points']}, Total wager: {total_wager}")
+
+>>>>>>> 1b3bc83fe93fe94b96a61f6c8e6661d9d228c284
 # Check results (award 10 points per correct answer, honor wagers)
 async def check_results():
     global current_assets, current_messages, bets
     if not current_assets:
         return
+<<<<<<< HEAD
     for guild in bot.guilds:  # Check results in all servers
         guild_id = guild.id
         channel = bot.get_channel(CHANNEL_ID.get(guild_id)) if CHANNEL_ID.get(guild_id) and bot.get_channel(CHANNEL_ID.get(guild_id)) else await get_default_channel(guild)
@@ -338,6 +432,43 @@ async def check_results():
                 else:
                     embed.add_field(name="Results", value="No bets placed.", inline=False)
                 await channel.send(embed=embed)
+=======
+    channel = bot.get_channel(CHANNEL_ID)
+    results = {}
+    for category, asset in current_assets.items():
+        old_price = asset["current_price"]
+        new_price = old_price + random.uniform(-50, 50) if isinstance(old_price, (int, float)) else old_price  # Mock price change
+        direction = "up" if new_price > old_price else "down"
+        results[category] = {"direction": direction, "old_price": old_price, "new_price": new_price}
+    for category in ["crypto", "stock", "forex"]:
+        embed = discord.Embed(
+            title=f"Results for {category.capitalize()}",
+            description=f"{current_assets[category]['name']} went {results[category]['direction']}!\n"
+                        f"Old price: ${results[category]['old_price']:.2f}, New price: ${results[category]['new_price']:.2f}",
+            color=0x0000ff
+        )
+        winners = []
+        for user_id, user_bets in bets.items():
+            if category in user_bets:
+                bet = user_bets[category]
+                # Enforce 7.5-hour window (27,000 seconds) for game schedule
+                if time.time() - bet["timestamp"] > 27000:
+                    continue
+                multiplier = 1 if bet["direction"] == results[category]["direction"] else 0  # 1 for correct, 0 for incorrect
+                points_won = bet["points"] * multiplier + 10 if multiplier else 0  # 10 points for correct, wager returned if incorrect
+                players[user_id]["points"] += points_won
+                if players[user_id]["points"] < 0:  # Prevent negative points
+                    players[user_id]["points"] = 0
+                result = f"+{points_won} points" if points_won > 0 else "0 points"
+                winners.append(f"{players[user_id]['name']}: {result}")
+                print(f"{user_id} on {category}: Bet {bet['points']} on {bet['direction']}, Result {results[category]['direction']}, Points won {points_won}, New balance: {players[user_id]['points']}")
+        save_players(players)
+        if winners:
+            embed.add_field(name="Results", value="\n".join(winners), inline=False)
+        else:
+            embed.add_field(name="Results", value="No bets placed.", inline=False)
+        await channel.send(embed=embed)
+>>>>>>> 1b3bc83fe93fe94b96a61f6c8e6661d9d228c284
     current_assets = {}
     current_messages = {}
     bets = {}
