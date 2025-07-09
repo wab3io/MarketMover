@@ -8,9 +8,10 @@ import json
 import asyncio
 import time
 import random
-from pytz import timezone
+from pytz import timezone, UTC
 from flask import Flask
 from threading import Thread
+from datetime import datetime, timedelta
 
 # Bot setup
 load_dotenv()  # Use default Replit .env loading
@@ -23,6 +24,7 @@ intents = Intents.default()
 intents.message_content = True  # Allows the bot to read message content
 intents.members = True  # Enable server members intent (if needed)
 intents.presences = True  # Enable presence intent (if needed)
+intents.messages = True  # Ensure message intent is enabled
 
 bot = commands.Bot(command_prefix="!", intents=intents)
 
@@ -32,6 +34,11 @@ bets = {}  # {user_id: {category: {"points": int, "direction": str, "timestamp":
 current_assets = {}  # Store assets {category: asset}
 current_messages = {}  # Track multiple messages {category: message}
 CHANNEL_ID = {}  # Dictionary to store channel IDs per guild
+last_post_time = None
+next_post_time = None
+SERVER_TIMEZONES = {}  # Dictionary to store time zones per guild (default to 'UTC')
+ALERT_CHANNEL_ID = {}  # Dictionary to store alert channel IDs per guild
+POST_COOLDOWN_MINUTES = 5  # Minimum time between posts in minutes
 
 # Mock data for stocks and forex (since free APIs are limited)
 stocks = ["AAPL", "GOOGL", "MSFT", "AMZN", "TSLA", "NVDA", "META", "JPM", "V", "WMT"]
@@ -122,54 +129,148 @@ def keep_alive():
 # Bot ready event
 @bot.event
 async def on_ready():
+    global last_post_time, next_post_time  # Declare globals at the top
     print(f"Logged in as {bot.user}")
     global players
     players = load_players()
     print(f"Loaded players: {players}")
-    # Start fresh with no initial players beyond load
     print(f"Before save, players: {players}")  # Debug
     save_players(players)  # Save initial state
     keep_alive()  # Start web server
-    print("Bot is ready and waiting for scheduled posts at 6:30 AM PT...")
+    last_post_time = None  # Reset last_post_time on startup to allow immediate post after cooldown
+    print(f"Initial last_post_time reset to: {last_post_time}")
+    # Calculate next post time (next 6:30 AM UTC or 2:00 PM UTC)
+    now = datetime.now(timezone('UTC'))
+    if now.hour < 6 or (now.hour == 6 and now.minute < 30):
+        next_post_time = now.replace(hour=6, minute=30, second=0, microsecond=0, tzinfo=UTC)
+    elif now.hour < 14 or (now.hour == 14 and now.minute < 0):
+        next_post_time = now.replace(hour=14, minute=0, second=0, microsecond=0, tzinfo=UTC)
+    else:
+        next_post_time = now.replace(hour=6, minute=30, second=0, microsecond=0, tzinfo=UTC) + timedelta(days=1)
+    bot.loop.create_task(game_loop())  # Start the game loop
+    print(f"Bot is ready and waiting for scheduled posts at {next_post_time.strftime('%I:%M %p UTC')}...")
+    # Notify users if any channel needs to be set
+    for guild in bot.guilds:
+        channel_set = bool(CHANNEL_ID.get(guild.id) or get_default_channel(guild))
+        alert_set = bool(ALERT_CHANNEL_ID.get(guild.id) or get_default_channel(guild))
+        if not channel_set or not alert_set:
+            default_channel = get_default_channel(guild)
+            if default_channel:
+                try:
+                    await default_channel.send("You need to set the channel using !setchannel and !setbotalert.")
+                    print(f"Sent channel setup notification to default channel {default_channel.name} in {guild.name}")
+                except Exception as e:
+                    print(f"Failed to send channel setup notification in {guild.name}: {e}")
+    # Notify users of bot status in alert channels or default if not set
+    for guild in bot.guilds:
+        alert_channel = bot.get_channel(ALERT_CHANNEL_ID.get(guild.id, get_default_channel(guild)))
+        print(f"Checking ALERT_CHANNEL_ID for guild {guild.name} (ID: {guild.id}): {alert_channel}")  # Debug alert channel
+        if alert_channel:
+            try:
+                message = await alert_channel.send("Bot has restarted.")
+                print(f"Sent restart notification to {alert_channel.name} in {guild.name} with message ID: {message.id}")
+            except Exception as e:
+                print(f"Failed to send restart notification in {guild.name}: {e}")
 
-# Game loop (posts at 6:30 AM and 2:00 PM PT, weekdays only)
+# Bot disconnect event
+@bot.event
+async def on_disconnect():
+    print("Bot is disconnecting...")
+    for guild in bot.guilds:
+        alert_channel = bot.get_channel(ALERT_CHANNEL_ID.get(guild.id, get_default_channel(guild)))
+        print(f"Checking ALERT_CHANNEL_ID for disconnect in guild {guild.name} (ID: {guild.id}): {alert_channel}")  # Debug alert channel
+        if alert_channel:
+            try:
+                message = await alert_channel.send("Bot is now offline.")
+                print(f"Sent offline notification to {alert_channel.name} in {guild.name} with message ID: {message.id}")
+            except Exception as e:
+                print(f"Failed to send offline notification in {guild.name}: {e}")
+        else:
+            print(f"No alert channel available for guild {guild.name} (ID: {guild.id}) during disconnect.")
+
+# Before loop cleanup
+async def before_loop():
+    print("Cleaning up before loop ends...")
+    for guild in bot.guilds:
+        alert_channel = bot.get_channel(ALERT_CHANNEL_ID.get(guild.id, get_default_channel(guild)))
+        print(f"Checking ALERT_CHANNEL_ID for cleanup in guild {guild.name} (ID: {guild.id}): {alert_channel}")  # Debug alert channel
+        if alert_channel:
+            try:
+                message = await alert_channel.send("Bot is shutting down.")
+                print(f"Sent shutdown notification to {alert_channel.name} in {guild.name} with message ID: {message.id}")
+            except Exception as e:
+                print(f"Failed to send shutdown notification in {guild.name}: {e}")
+        else:
+            print(f"No alert channel available for guild {guild.name} (ID: {guild.id}) during cleanup.")
+
+# Shutdown task to ensure alert on stop
+async def shutdown_task():
+    await before_loop()
+    await asyncio.sleep(1)  # Brief delay to allow cleanup
+    await bot.close()
+
+# Game loop (posts at 6:30 AM UTC, weekdays only)
 async def game_loop():
+    await before_loop()  # Run cleanup before starting the loop
     while True:
-        pacific = timezone('America/Los_Angeles')
-        now = pacific.localize(time.localtime())  # Use PT timezone
-        # Skip weekends (Saturday=5, Sunday=6 in weekday numbering)
+        utc = timezone('UTC')  # Use UTC timezone
+        now = datetime.utcnow().replace(tzinfo=UTC)  # Convert to UTC
+        global last_post_time  # Declare global here for the loop
+        print(f"Loop running at: {now}, Localized Hour: {now.hour}, System Hour: {now.hour}, Minute: {now.minute}, last_post_time: {last_post_time}")  # Enhanced debug
         if 0 <= now.weekday() <= 4:  # Monday to Friday
-            if now.hour == 6 and now.minute == 30:  # 6:30 AM PT
-                await post_assets()
-            elif now.hour == 14 and now.minute == 0:  # 2:00 PM PT
+            if now.hour == 6 and now.minute == 30:  # 6:30 AM UTC (1:30 AM MST)
+                if last_post_time is None or (now - last_post_time).total_seconds() >= POST_COOLDOWN_MINUTES * 60:
+                    print(f"Triggering post_assets at {now}")
+                    await post_assets()
+                    last_post_time = now  # Update only after successful post
+            elif now.hour == 14 and now.minute == 0:  # 2:00 PM UTC (future reference)
+                print(f"Triggering check_results at {now}")
                 await check_results()
         await asyncio.sleep(60)  # Check every minute
 
 # Post new assets (separate posts with mentions in title)
 async def post_assets():
-    global current_assets, current_messages, bets
+    global current_assets, current_messages, bets, last_post_time
     bets = {}  # Reset bets
     current_assets = get_daily_assets()
+    print(f"post_assets called, current_assets: {current_assets}")  # Debug asset fetch
     if not all(current_assets.values()):
+        print("Failed to fetch all assets, skipping post.")
         return
     for guild in bot.guilds:  # Post in all servers where the bot is added
         guild_id = guild.id
-        channel = bot.get_channel(CHANNEL_ID.get(guild_id)) if CHANNEL_ID.get(guild_id) and bot.get_channel(CHANNEL_ID.get(guild_id)) else await get_default_channel(guild)
+        tz = SERVER_TIMEZONES.get(guild_id, 'UTC')  # Default to UTC
+        channel = bot.get_channel(CHANNEL_ID.get(guild_id))
+        print(f"Checking CHANNEL_ID for guild {guild.name} (ID: {guild_id}): {channel}")  # Debug channel check
+        if not channel and not get_default_channel(guild):
+            print(f"No CHANNEL_ID or default channel available for guild {guild.name} (ID: {guild_id}), skipping post.")
+            continue
+        if not channel:
+            channel = get_default_channel(guild)
+            print(f"No CHANNEL_ID for guild {guild.name} (ID: {guild_id}), using default channel: {channel.name if channel else 'None'}")
         if channel:
+            print(f"Attempting to post to channel: {channel.name} in guild: {guild.name} (Timezone: {tz})")
             for category, asset in current_assets.items():
                 mention = "@Crypto" if category == "crypto" else "@Stocks" if category == "stock" else "@FOREX"
                 embed = discord.Embed(
                     title=f"Daily {mention} Prediction",
-                    description=f"Will {asset['name']} ({asset['symbol']}) go 📈 or 📉 by 2:00 PM PT?\n"
-                                f"Posted at 6:30 AM PT. React with 📈 or 📉 to predict for free! Win 10 points per correct answer. "
+                    description=f"Will {asset['name']} ({asset['symbol']}) go 📈 or 📉 by 2:00 PM UTC?\n"
+                                f"Posted at 6:30 AM UTC. React with 📈 or 📉 to predict for free! Win 10 points per correct answer. "
                                 f"Use `!bet <points> <up/down> {category}` to wager your points, or `!leverage <points> {category}` to increase your bet.",
                     color=0x00ff00
                 )
-                current_messages[category] = await channel.send(embed=embed)
-                await current_messages[category].add_reaction("📈")  # Stock up emoji
-                await current_messages[category].add_reaction("📉")  # Stock down emoji
+                try:
+                    current_messages[category] = await channel.send(embed=embed)
+                    await current_messages[category].add_reaction("📈")  # Stock up emoji
+                    await current_messages[category].add_reaction("📉")  # Stock down emoji
+                    print(f"Successfully posted {category} prediction in {channel.name}")
+                    last_post_time = datetime.utcnow().replace(tzinfo=UTC)  # Update last_post_time on success
+                except discord.Forbidden:
+                    print(f"Bot lacks permission to post in {channel.name}")
+                except Exception as e:
+                    print(f"Error posting {category} prediction: {e}")
         else:
-            print(f"No suitable channel found in guild {guild.name} (ID: {guild.id})")
+            print(f"No suitable channel found in guild {guild.name} (ID: {guild_id})")
 
 # Handle reactions (per category, no channel confirmation, free prediction)
 @bot.event
@@ -199,7 +300,7 @@ async def on_reaction_add(reaction, user):
 @bot.command()
 async def bet(ctx, points: int, direction: str, category: str):
     if not current_assets:
-        await ctx.send("No active predictions. Please wait for the daily post at 6:30 AM PT.")
+        await ctx.send("No active predictions. Please wait for the daily post at 6:30 AM UTC.")
         return
     if direction.lower() not in ["up", "down"]:
         await ctx.send("Direction must be 'up' or 'down'.")
@@ -231,7 +332,7 @@ async def bet(ctx, points: int, direction: str, category: str):
 @bot.command()
 async def predict(ctx, direction: str, category: str):
     if not current_assets:
-        await ctx.send("No active predictions. Please wait for the daily post at 6:30 AM PT.")
+        await ctx.send("No active predictions. Please wait for the daily post at 6:30 AM UTC.")
         return
     direction = direction.lower()
     if direction not in ["up", "down"]:
@@ -258,7 +359,7 @@ async def predict(ctx, direction: str, category: str):
 @bot.command()
 async def leverage(ctx, points: int, category: str):
     if not current_assets:
-        await ctx.send("No active predictions. Please wait for the daily post at 6:30 AM PT.")
+        await ctx.send("No active predictions. Please wait for the daily post at 6:30 AM UTC.")
         return
     user_id = str(ctx.author.id)
     if user_id not in players:
@@ -287,13 +388,44 @@ async def leverage(ctx, points: int, category: str):
     await ctx.send(f"{ctx.author.name} leveraged {points} points on {category} at {time.ctime()}, New balance: {players[user_id]['points']}, Total wager: {total_wager}")
     print(f"{ctx.author.name} leveraged {points} points on {category} at {time.ctime()}, New balance: {players[user_id]['points']}, Total wager: {total_wager}")
 
+# Status command
+@bot.command()
+async def status(ctx):
+    channel = bot.get_channel(CHANNEL_ID.get(ctx.guild.id))
+    global last_post_time, next_post_time
+    last_post = "Never" if last_post_time is None else last_post_time.strftime("%I:%M %p UTC")
+    # Calculate next post time
+    now = datetime.now(timezone('UTC'))
+    if now.hour < 6 or (now.hour == 6 and now.minute < 30):
+        next_post_time = now.replace(hour=6, minute=30, second=0, microsecond=0, tzinfo=UTC)
+    elif now.hour < 14 or (now.hour == 14 and now.minute < 0):
+        next_post_time = now.replace(hour=14, minute=0, second=0, microsecond=0, tzinfo=UTC)
+    else:
+        next_post_time = now.replace(hour=6, minute=30, second=0, microsecond=0, tzinfo=UTC) + timedelta(days=1)
+    next_post_time = next_post_time.strftime("%I:%M %p UTC")
+    embed = discord.Embed(title="Bot Status", color=0x00ff00)
+    embed.add_field(name="Channel Set", value=channel.name if channel else "Not set (run !setchannel)", inline=True)
+    embed.add_field(name="Last Post", value=last_post, inline=True)
+    embed.add_field(name="Next Scheduled Post", value=next_post_time, inline=True)
+    await ctx.send(embed=embed)
+
 # Set channel command
 @bot.command()
 async def setchannel(ctx):
     global CHANNEL_ID
     guild_id = ctx.guild.id
     CHANNEL_ID[guild_id] = ctx.channel.id
+    print(f"Set CHANNEL_ID for guild {ctx.guild.name} (ID: {guild_id}) to {ctx.channel.name} (ID: {CHANNEL_ID[guild_id]})")  # Debug channel set
     await ctx.send(f"Channel set to {ctx.channel.name} (ID: {CHANNEL_ID[guild_id]}) for this server.")
+
+# Set bot alert channel command
+@bot.command()
+async def setbotalert(ctx):
+    global ALERT_CHANNEL_ID
+    guild_id = ctx.guild.id
+    ALERT_CHANNEL_ID[guild_id] = ctx.channel.id
+    print(f"Set ALERT_CHANNEL_ID for guild {ctx.guild.name} (ID: {guild_id}) to {ctx.channel.name} (ID: {ALERT_CHANNEL_ID[guild_id]})")  # Debug alert channel set
+    await ctx.send(f"Bot alert channel updated to {ctx.channel.name} (ID: {ALERT_CHANNEL_ID[guild_id]}) for this server.")
 
 # Check results (award 10 points per correct answer, honor wagers)
 async def check_results():
@@ -302,7 +434,7 @@ async def check_results():
         return
     for guild in bot.guilds:  # Check results in all servers
         guild_id = guild.id
-        channel = bot.get_channel(CHANNEL_ID.get(guild_id)) if CHANNEL_ID.get(guild_id) and bot.get_channel(CHANNEL_ID.get(guild_id)) else await get_default_channel(guild)
+        channel = bot.get_channel(CHANNEL_ID.get(guild.id)) if CHANNEL_ID.get(guild.id) and bot.get_channel(CHANNEL_ID.get(guild.id)) else get_default_channel(guild)  # Use set channel or default
         if channel:
             results = {}
             for category, asset in current_assets.items():
@@ -360,4 +492,10 @@ async def support(ctx):
     await ctx.send("Support Market Mover! Time is money—tip to keep the markets moving. Donate:\n- Bitcoin (BTC): bc1qdpugyzg3jv8s88qs0xpt6gh4kewnh8ek3udgpe\n- USDC on ETH: 0x4F3a5C130d1aa7dE39BEe1Ff455039eCEeD7682")
 
 # Start bot
-bot.run(BOT_TOKEN)
+try:
+    bot.run(BOT_TOKEN)
+except KeyboardInterrupt:
+    asyncio.create_task(shutdown_task())
+except Exception as e:
+    print(f"Bot encountered an error: {e}")
+    asyncio.create_task(shutdown_task())
