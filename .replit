@@ -1,5 +1,8 @@
 run = "source venv/bin/activate && python bot.py"
+modules = ["python-3.11"]
 
 [[ports]]
 localPort = 8080
 externalPort = 80
+
+[nix]
